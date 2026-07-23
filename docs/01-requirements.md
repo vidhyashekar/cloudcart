@@ -317,3 +317,4 @@ Future releases may include:
 - 03-service-boundaries.md
 - 04-database-design.md
 - 05-api-design.md
+- 06-repo-structure.md
