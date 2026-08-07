@@ -1,26 +1,20 @@
 package main
 
 import (
-	"net/http"
+	"log"
 
-	"github.com/vidhyashekar/cloudcart/services/auth-service/internal/config"
-	"github.com/vidhyashekar/cloudcart/services/auth-service/internal/logger"
-	"github.com/vidhyashekar/cloudcart/services/auth-service/internal/router"
+	"github.com/vidhyashekar/cloudcart/services/auth-service/internal/app"
 )
 
 func main() {
-	// Load configuration
-	config := config.LoadConfig()
+	// Load dependencies and initialize the application
+	app, err := app.New()
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	// Initialize logger
-	log := logger.New()
-
-	// Register routes
-	router.RegisterRoutes()
-
-	log.Infof("Starting Auth-service on port %s", config.Port)
-
-	if err := http.ListenAndServe(":"+config.Port, nil); err != nil {
+	err = app.Run()
+	if err != nil {
 		log.Fatal(err)
 	}
 }
