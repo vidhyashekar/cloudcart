@@ -28,6 +28,12 @@ func New() (*App, error) {
 	}
 	log.Info("Connected to the database successfully")
 
+	err = database.Migrate(db)
+	if err != nil {
+		return nil, err
+	}
+	log.Info("Schema and tables migrated successfully")
+
 	return &App{
 		Config: config,
 		Logger: log,
