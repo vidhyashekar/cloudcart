@@ -140,7 +140,10 @@ Notice:
 - Four schemas
 - Each schema owns its own tables
 
-This is still a valid implementation of the Database per Service pattern because ownership is enforced at the schema level.
+
+This design follows the database ownership principle of the Database per Service pattern at the schema level. Each service owns and controls its schema and does not directly access another service's tables.
+
+For this learning project, we use one PostgreSQL database with multiple schemas to reduce operational complexity and cost. If stronger physical isolation is required in the future, individual services can be migrated to separate databases or RDS instances.
 
 ### For this project
 
@@ -188,7 +191,7 @@ Why?
 
 ### Notification Schema
 ```
-- Notification Schema
+- notification_logs
 ```
 
 ## Relationships
