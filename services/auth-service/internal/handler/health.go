@@ -1,12 +1,9 @@
 package handler
 
-import (
-	"fmt"
-	"net/http"
-)
+import "github.com/gin-gonic/gin"
 
-func HealthHandler(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("OK"))
-	fmt.Fprintln(w, "auth-service is healthy")
+func HealthHandler(c *gin.Context) {
+	c.JSON(200, gin.H{
+		"status": "UP",
+	})
 }
