@@ -27,3 +27,20 @@ type ProductResponse struct {
 	StockQuantity int     `json:"stock_quantity"`
 	CategoryID    uint    `json:"category_id"`
 }
+
+// ProductQuery represents the query parameters for filtering and paginating products.
+type ProductQuery struct {
+	Search     string
+	CategoryID uint
+	Page       int
+	Limit      int
+}
+
+// ProductListResponse represents the response payload for a list of products with pagination information.
+type ProductListResponse struct {
+	Page       int               `json:"page"`
+	Limit      int               `json:"limit"`
+	Total      int64             `json:"total"`
+	TotalPages int               `json:"total_pages"`
+	Products   []ProductResponse `json:"products"`
+}

@@ -1,14 +1,18 @@
 package service
 
 import (
+	"errors"
+	"fmt"
+
 	"github.com/vidhyashekar/cloudcart/services/product-service/internal/model"
 	"github.com/vidhyashekar/cloudcart/services/product-service/internal/repository"
+	"gorm.io/gorm"
 )
 
 // ProductService defines the interface for product-related operations.
 type ProductService interface {
 	CreateProduct(request CreateProductRequest) (*ProductResponse, error)
-	GetProducts() ([]ProductResponse, error)
+	GetProducts(query ProductQuery) (*ProductListResponse, error)
 	GetProductByID(id uint) (*ProductResponse, error)
 	UpdateProduct(id uint, request UpdateProductRequest) (*ProductResponse, error)
 	DeleteProduct(id uint) error
@@ -44,8 +48,27 @@ func (s *productService) CreateProduct(request CreateProductRequest) (*ProductRe
 }
 
 // GetProducts retrieves all products from the database.
-func (s *productService) GetProducts() ([]ProductResponse, error) {
-	products, err := s.productRepository.FindAll()
+func (s *productService) GetProducts(query ProductQuery) (*ProductListResponse, error) {
+	if query.Page < 1 {
+		query.Page = 1
+	}
+
+	if query.Limit < 1 {
+		query.Limit = 10
+	}
+
+	if query.Limit > 100 {
+		query.Limit = 100
+	}
+
+	filter := repository.ProductFilter{
+		Search:     query.Search,
+		CategoryID: query.CategoryID,
+		Page:       query.Page,
+		Limit:      query.Limit,
+	}
+
+	products, total, err := s.productRepository.FindAll(filter)
 	if err != nil {
 		return nil, err
 	}
@@ -56,7 +79,15 @@ func (s *productService) GetProducts() ([]ProductResponse, error) {
 		responses = append(responses, *toProductResponse(&product))
 	}
 
-	return responses, nil
+	totalPages := int((total + int64(query.Limit) - 1) / int64(query.Limit))
+
+	return &ProductListResponse{
+		Products:   responses,
+		Page:       query.Page,
+		Limit:      query.Limit,
+		Total:      total,
+		TotalPages: totalPages,
+	}, nil
 }
 
 // GetProductByID retrieves a product by its ID.
@@ -76,6 +107,14 @@ func (s *productService) UpdateProduct(id uint, request UpdateProductRequest) (*
 		return nil, err
 	}
 
+	_, err = s.productRepository.GetCategoryByID(request.CategoryID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, fmt.Errorf("category with ID %d not found", request.CategoryID)
+		}
+		return nil, err
+	}
+
 	product.Name = request.Name
 	product.Description = request.Description
 	product.Price = request.Price
@@ -91,6 +130,10 @@ func (s *productService) UpdateProduct(id uint, request UpdateProductRequest) (*
 
 // DeleteProduct removes a product by its ID.
 func (s *productService) DeleteProduct(id uint) error {
+	_, err := s.productRepository.FindByID(id)
+	if err != nil {
+		return fmt.Errorf("product with ID %d not found", id)
+	}
 	return s.productRepository.Delete(id)
 }
 

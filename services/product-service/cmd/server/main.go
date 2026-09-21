@@ -6,15 +6,14 @@ import (
 	"github.com/vidhyashekar/cloudcart/services/product-service/internal/app"
 )
 
+// main is the entry point of the product-service application. It initializes the application and starts the HTTP server.
 func main() {
-	log.Println("Starting the server...")
-	// Load dependencies and initialize the application
 	app, err := app.New()
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Println("Product Service database initialized successfully")
 
-	_ = app
-
+	if err := app.Run(); err != nil {
+		log.Fatal(err)
+	}
 }

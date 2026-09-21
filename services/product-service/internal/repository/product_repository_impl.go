@@ -36,14 +36,39 @@ func (r *productRepository) FindByID(id uint) (*model.Product, error) {
 }
 
 // FindAll retrieves all products from the database.
-func (r *productRepository) FindAll() ([]model.Product, error) {
+func (r *productRepository) FindAll(filter ProductFilter) ([]model.Product, int64, error) {
 	var products []model.Product
+	var total int64
 
-	err := r.db.
+	query := r.db.Model(&model.Product{})
+
+	if filter.Search != "" {
+		search := "%" + filter.Search + "%"
+		query = query.Where(
+			"name ILIKE ? OR description ILIKE ?",
+			search,
+			search,
+		)
+	}
+
+	if filter.CategoryID != 0 {
+		query = query.Where("category_id = ?", filter.CategoryID)
+	}
+
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	offset := (filter.Page - 1) * filter.Limit
+
+	err := query.
 		Preload("Category").
+		Offset(offset).
+		Limit(filter.Limit).
+		Order("id DESC").
 		Find(&products).Error
 
-	return products, err
+	return products, total, err
 }
 
 // Update modifies an existing product in the database.
@@ -54,4 +79,15 @@ func (r *productRepository) Update(product *model.Product) error {
 // Delete removes a product from the database by its ID.
 func (r *productRepository) Delete(id uint) error {
 	return r.db.Delete(&model.Product{}, id).Error
+}
+
+// GetCategoryByID retrieves a category by its ID from the database.
+func (r *productRepository) GetCategoryByID(categoryID uint) (*model.Category, error) {
+	var category model.Category
+
+	if err := r.db.First(&category, categoryID).Error; err != nil {
+		return nil, err
+	}
+
+	return &category, nil
 }

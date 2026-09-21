@@ -11,6 +11,7 @@ type Config struct {
 	DBUser     string
 	DBPassword string
 	DBName     string
+	JWTSecret  string
 }
 
 func Load() *Config {
@@ -21,6 +22,7 @@ func Load() *Config {
 		DBUser:     getEnv("DB_USER", "postgres"),
 		DBPassword: getEnv("DB_PASSWORD", "postgres"),
 		DBName:     getEnv("DB_NAME", "cloudcart"),
+		JWTSecret:  getEnv("JWT_SECRET", "cloudcart-development-secret"),
 	}
 }
 
