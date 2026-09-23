@@ -8,4 +8,5 @@ type OrderRepository interface {
 	FindByID(id uint) (*model.Order, error)
 	FindByUserID(userID uint) ([]model.Order, error)
 	Update(order *model.Order) error
+	CreateWithTransaction(order *model.Order, items []model.OrderItem) error
 }
