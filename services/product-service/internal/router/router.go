@@ -21,6 +21,7 @@ func RegisterRoutes(productHandler *handler.ProductHandler, jwtSecret string) *g
 	{
 		productRoutes.GET("", productHandler.GetAll)
 		productRoutes.GET("/:id", productHandler.GetByID)
+		//productRoutes.PATCH("/:id/stock", productHandler.UpdateStock)
 
 		protected := productRoutes.Group("")
 		protected.Use(middleware.AuthMiddleware(jwtSecret))
@@ -28,6 +29,7 @@ func RegisterRoutes(productHandler *handler.ProductHandler, jwtSecret string) *g
 		protected.POST("", productHandler.Create)
 		protected.PUT("/:id", productHandler.Update)
 		protected.DELETE("/:id", productHandler.Delete)
+		protected.PATCH("/:id/stock", productHandler.UpdateStock)
 	}
 
 	return router
