@@ -44,3 +44,8 @@ type ProductListResponse struct {
 	TotalPages int               `json:"total_pages"`
 	Products   []ProductResponse `json:"products"`
 }
+
+// UpdateStockRequest represents the request payload for updating the stock quantity of a product.
+type UpdateStockRequest struct {
+	Quantity int `json:"quantity"`
+}

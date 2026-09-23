@@ -17,4 +17,5 @@ type ProductRepository interface {
 	Update(product *model.Product) error
 	Delete(id uint) error
 	GetCategoryByID(categoryID uint) (*model.Category, error)
+	UpdateStock(id uint, quantity int) error
 }

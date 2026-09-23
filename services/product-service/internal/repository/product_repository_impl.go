@@ -91,3 +91,24 @@ func (r *productRepository) GetCategoryByID(categoryID uint) (*model.Category, e
 
 	return &category, nil
 }
+
+// UpdateStock updates the stock quantity of a product in the database. It ensures that the stock quantity does not go below zero.
+func (r *productRepository) UpdateStock(id uint, quantity int) error {
+	result := r.db.
+		Model(&model.Product{}).
+		Where("id = ? AND stock_quantity >= ?", id, quantity).
+		UpdateColumn(
+			"stock_quantity",
+			gorm.Expr("stock_quantity - ?", quantity),
+		)
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+
+	return nil
+}
