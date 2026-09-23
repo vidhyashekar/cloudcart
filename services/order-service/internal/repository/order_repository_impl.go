@@ -54,3 +54,22 @@ func (r *orderRepository) FindByUserID(userID uint) ([]model.Order, error) {
 func (r *orderRepository) Update(order *model.Order) error {
 	return r.db.Save(order).Error
 }
+
+// CreateWithTransaction creates an order along with its associated items in a single transaction.
+func (r *orderRepository) CreateWithTransaction(order *model.Order, items []model.OrderItem) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(order).Error; err != nil {
+			return err
+		}
+
+		for i := range items {
+			items[i].OrderID = order.ID
+		}
+
+		if err := tx.Create(&items).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
+}
