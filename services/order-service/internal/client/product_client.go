@@ -11,4 +11,6 @@ type ProductResponse struct {
 // ProductClient defines the interface for interacting with the product service.
 type ProductClient interface {
 	GetProduct(id uint) (*ProductResponse, error)
+	DecreaseStock(id uint, quantity int) error
+	IncreaseStock(id uint, quantity int) error
 }
