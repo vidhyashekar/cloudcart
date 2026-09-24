@@ -1,5 +1,6 @@
 # Order Service Flow
 
+```
 POST /orders
      ↓
 Order Handler
@@ -20,3 +21,4 @@ DB Transaction
      ↓
 Kafka: order.created
 
+```
