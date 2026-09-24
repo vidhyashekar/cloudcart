@@ -16,7 +16,8 @@ type ProductService interface {
 	GetProductByID(id uint) (*ProductResponse, error)
 	UpdateProduct(id uint, request UpdateProductRequest) (*ProductResponse, error)
 	DeleteProduct(id uint) error
-	UpdateStock(id uint, quantity int) error
+	DecreaseStock(id uint, quantity int) error
+	IncreaseStock(id uint, quantity int) error
 }
 
 // CreateProductRequest represents the request payload for creating a new product.
@@ -150,11 +151,20 @@ func toProductResponse(product *model.Product) *ProductResponse {
 	}
 }
 
-// UpdateStock updates the stock quantity of a product by its ID.
-func (s *productService) UpdateStock(id uint, quantity int) error {
+// DecreaseStock decreases the stock quantity of a product by its ID.
+func (s *productService) DecreaseStock(id uint, quantity int) error {
 	if quantity <= 0 {
 		return fmt.Errorf("quantity must be greater than zero")
 	}
 
-	return s.productRepository.UpdateStock(id, quantity)
+	return s.productRepository.DecreaseStock(id, quantity)
+}
+
+// IncreaseStock increases the stock quantity of a product by its ID.
+func (s *productService) IncreaseStock(id uint, quantity int) error {
+	if quantity <= 0 {
+		return fmt.Errorf("quantity must be greater than zero")
+	}
+
+	return s.productRepository.IncreaseStock(id, quantity)
 }
