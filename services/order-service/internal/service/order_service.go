@@ -4,6 +4,8 @@ import (
 	"fmt"
 
 	"github.com/vidhyashekar/cloudcart/services/order-service/internal/client"
+	"github.com/vidhyashekar/cloudcart/services/order-service/internal/event"
+	"github.com/vidhyashekar/cloudcart/services/order-service/internal/kafka"
 	"github.com/vidhyashekar/cloudcart/services/order-service/internal/model"
 	"github.com/vidhyashekar/cloudcart/services/order-service/internal/repository"
 )
@@ -19,13 +21,15 @@ type OrderService interface {
 type orderService struct {
 	orderRepository repository.OrderRepository
 	productClient   client.ProductClient
+	kafkaProducer   *kafka.Producer
 }
 
 // NewOrderService creates a new instance of orderService with the provided order repository and product client.
-func NewOrderService(orderRepository repository.OrderRepository, productClient client.ProductClient) OrderService {
+func NewOrderService(orderRepository repository.OrderRepository, productClient client.ProductClient, kafkaProducer *kafka.Producer) OrderService {
 	return &orderService{
 		orderRepository: orderRepository,
 		productClient:   productClient,
+		kafkaProducer:   kafkaProducer,
 	}
 }
 
@@ -151,7 +155,24 @@ func (s *orderService) CreateOrder(userID uint, request CreateOrderRequest) (*Or
 	// 6. Attach items to order for response.
 	order.Items = items
 
-	// 7. Return response.
+	// 7. Publish order created event to Kafka.
+	err := s.kafkaProducer.PublishOrderCreated(
+		event.OrderCreatedEvent{
+			EventType:   "order.created",
+			OrderID:     order.ID,
+			UserID:      order.UserID,
+			TotalAmount: order.TotalAmount,
+		},
+	)
+	// TODO DB transaction → SUCCESS Kafka publish  → FAILED
+	if err != nil {
+		return nil, fmt.Errorf(
+			"order created but failed to publish event: %w",
+			err,
+		)
+	}
+
+	// 8. Return response.
 	return toOrderResponse(order), nil
 }
 

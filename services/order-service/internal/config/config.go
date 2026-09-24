@@ -11,6 +11,8 @@ type Config struct {
 	DBName            string
 	JWTSecret         string
 	ProductServiceURL string
+	KafkaBrokers      string
+	KafkaTopic        string
 }
 
 func Load() *Config {
@@ -23,6 +25,8 @@ func Load() *Config {
 		DBName:            getEnv("DB_NAME", "cloudcart"),
 		JWTSecret:         getEnv("JWT_SECRET", "cloudcart-development-secret"),
 		ProductServiceURL: getEnv("PRODUCT_SERVICE_URL", "http://localhost:8081"),
+		KafkaBrokers:      getEnv("KAFKA_BROKERS", "localhost:9092"),
+		KafkaTopic:        getEnv("KAFKA_TOPIC", "order-events"),
 	}
 }
 

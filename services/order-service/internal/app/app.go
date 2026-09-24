@@ -6,6 +6,7 @@ import (
 	"github.com/vidhyashekar/cloudcart/services/order-service/internal/config"
 	"github.com/vidhyashekar/cloudcart/services/order-service/internal/database"
 	"github.com/vidhyashekar/cloudcart/services/order-service/internal/handler"
+	"github.com/vidhyashekar/cloudcart/services/order-service/internal/kafka"
 	"github.com/vidhyashekar/cloudcart/services/order-service/internal/repository"
 	"github.com/vidhyashekar/cloudcart/services/order-service/internal/router"
 	"github.com/vidhyashekar/cloudcart/services/order-service/internal/service"
@@ -43,7 +44,12 @@ func New() (*App, error) {
 		cfg.ProductServiceURL,
 	)
 
-	orderService := service.NewOrderService(orderRepository, productClient)
+	kafkaProducer, err := kafka.NewProducer(cfg.KafkaBrokers, cfg.KafkaTopic)
+	if err != nil {
+		return nil, err
+	}
+
+	orderService := service.NewOrderService(orderRepository, productClient, kafkaProducer)
 
 	orderHandler := handler.NewOrderHandler(orderService)
 
