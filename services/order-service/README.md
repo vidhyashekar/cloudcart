@@ -1,5 +1,6 @@
 # Order Service Flow
 
+```
 POST /orders
      ↓
 Order Handler
