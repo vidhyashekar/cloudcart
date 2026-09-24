@@ -29,7 +29,8 @@ func RegisterRoutes(productHandler *handler.ProductHandler, jwtSecret string) *g
 		protected.POST("", productHandler.Create)
 		protected.PUT("/:id", productHandler.Update)
 		protected.DELETE("/:id", productHandler.Delete)
-		protected.PATCH("/:id/stock", productHandler.UpdateStock)
+		protected.PATCH("/:id/stock/decrease", productHandler.DecreaseStock)
+		protected.PATCH("/:id/stock/increase", productHandler.IncreaseStock)
 	}
 
 	return router
