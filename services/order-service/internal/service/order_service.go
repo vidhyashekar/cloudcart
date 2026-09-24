@@ -29,14 +29,15 @@ func NewOrderService(orderRepository repository.OrderRepository, productClient c
 	}
 }
 
-// CreateOrder creates a new order for the specified user with the provided order request.
+// CreateOrder creates a new order for the specified user based on the provided request.
 func (s *orderService) CreateOrder(userID uint, request CreateOrderRequest) (*OrderResponse, error) {
-	// Validate the order request
+
+	// 1. Validate order
 	if len(request.Items) == 0 {
 		return nil, fmt.Errorf("order must contain at least one item")
 	}
 
-	// Create a new order and calculate the total amount
+	// 2. Prepare order
 	order := &model.Order{
 		UserID: userID,
 		Status: "PLACED",
@@ -45,6 +46,10 @@ func (s *orderService) CreateOrder(userID uint, request CreateOrderRequest) (*Or
 	var items []model.OrderItem
 	var totalAmount float64
 
+	// Keep track of products whose stock was successfully decreased.
+	var decreasedProducts []CreateOrderItemRequest
+
+	// 3. Validate products and calculate total
 	for _, requestItem := range request.Items {
 
 		if requestItem.Quantity <= 0 {
@@ -54,7 +59,11 @@ func (s *orderService) CreateOrder(userID uint, request CreateOrderRequest) (*Or
 			)
 		}
 
-		product, err := s.productClient.GetProduct(requestItem.ProductID)
+		// Get product details from Product Service.
+		product, err := s.productClient.GetProduct(
+			requestItem.ProductID,
+		)
+
 		if err != nil {
 			return nil, fmt.Errorf(
 				"failed to get product %d: %w",
@@ -63,6 +72,7 @@ func (s *orderService) CreateOrder(userID uint, request CreateOrderRequest) (*Or
 			)
 		}
 
+		// Check stock.
 		if product.StockQuantity < requestItem.Quantity {
 			return nil, fmt.Errorf(
 				"insufficient stock for product %d",
@@ -70,8 +80,11 @@ func (s *orderService) CreateOrder(userID uint, request CreateOrderRequest) (*Or
 			)
 		}
 
+		// Calculate item subtotal using the price
+		// returned by Product Service.
 		subtotal := product.Price * float64(requestItem.Quantity)
 
+		// Create order item.
 		items = append(items, model.OrderItem{
 			ProductID: requestItem.ProductID,
 			Quantity:  requestItem.Quantity,
@@ -79,17 +92,66 @@ func (s *orderService) CreateOrder(userID uint, request CreateOrderRequest) (*Or
 			Subtotal:  subtotal,
 		})
 
+		// Calculate order total.
 		totalAmount += subtotal
 	}
 
 	order.TotalAmount = totalAmount
 
-	if err := s.orderRepository.CreateWithTransaction(order, items); err != nil {
-		return nil, err
+	// 4. Reserve/decrease stock.
+	for _, item := range request.Items {
+
+		if err := s.productClient.DecreaseStock(
+			item.ProductID,
+			item.Quantity,
+		); err != nil {
+
+			// Compensate stock that was already decreased.
+			for _, decreased := range decreasedProducts {
+				_ = s.productClient.IncreaseStock(
+					decreased.ProductID,
+					decreased.Quantity,
+				)
+			}
+
+			return nil, fmt.Errorf(
+				"failed to reserve stock for product %d: %w",
+				item.ProductID,
+				err,
+			)
+		}
+
+		// Remember successful stock updates.
+		decreasedProducts = append(
+			decreasedProducts,
+			item,
+		)
 	}
 
+	// 5. Create Order + Order Items in one DB transaction.
+	if err := s.orderRepository.CreateWithTransaction(
+		order,
+		items,
+	); err != nil {
+		// Order creation failed.
+		// Restore all stock that was already decreased.
+		for _, item := range decreasedProducts {
+			_ = s.productClient.IncreaseStock(
+				item.ProductID,
+				item.Quantity,
+			)
+		}
+
+		return nil, fmt.Errorf(
+			"failed to create order: %w",
+			err,
+		)
+	}
+
+	// 6. Attach items to order for response.
 	order.Items = items
 
+	// 7. Return response.
 	return toOrderResponse(order), nil
 }
 

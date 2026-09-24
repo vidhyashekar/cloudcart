@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 )
 
 // ProductResponse represents the response structure for a product.
@@ -41,4 +42,53 @@ func (p *productClient) GetProduct(id uint) (*ProductResponse, error) {
 	}
 
 	return &product, nil
+}
+
+// DecreaseStock decreases the stock quantity of a product by its ID.
+func (p *productClient) DecreaseStock(id uint, quantity int) error {
+	return p.updateStock(id, quantity, "decrease")
+}
+
+// IncreaseStock increases the stock quantity of a product by its ID.
+func (p *productClient) IncreaseStock(id uint, quantity int) error {
+	return p.updateStock(id, quantity, "increase")
+}
+
+// updateStock is a helper method to update the stock quantity of a product by its ID. It sends a PATCH request to the product service with the specified action (decrease or increase).
+func (p *productClient) updateStock(id uint, quantity int, action string) error {
+	url := fmt.Sprintf(
+		"%s/api/v1/products/%d/stock/%s",
+		p.baseURL,
+		id,
+		action,
+	)
+
+	body := fmt.Sprintf(`{"quantity":%d}`, quantity)
+
+	req, err := http.NewRequest(
+		http.MethodPatch,
+		url,
+		strings.NewReader(body),
+	)
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := p.client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf(
+			"failed to %s stock for product %d",
+			action,
+			id,
+		)
+	}
+
+	return nil
 }
