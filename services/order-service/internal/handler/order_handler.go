@@ -3,6 +3,7 @@ package handler
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/vidhyashekar/cloudcart/services/order-service/internal/service"
@@ -37,9 +38,22 @@ func (h *OrderHandler) Create(c *gin.Context) {
 		return
 	}
 
+	// Get the Authorization header and extract the token to pass to the product service for stock updates.
+	authHeader := c.GetHeader("Authorization")
+
+	if !strings.HasPrefix(authHeader, "Bearer ") {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": "invalid authorization header",
+		})
+		return
+	}
+
+	token := strings.TrimPrefix(authHeader, "Bearer ")
+
 	order, err := h.orderService.CreateOrder(
 		userID.(uint),
 		request,
+		token,
 	)
 
 	if err != nil {
