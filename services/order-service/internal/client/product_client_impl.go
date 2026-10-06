@@ -3,6 +3,7 @@ package client
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 )
@@ -45,17 +46,17 @@ func (p *productClient) GetProduct(id uint) (*ProductResponse, error) {
 }
 
 // DecreaseStock decreases the stock quantity of a product by its ID.
-func (p *productClient) DecreaseStock(id uint, quantity int) error {
-	return p.updateStock(id, quantity, "decrease")
+func (p *productClient) DecreaseStock(id uint, quantity int, token string) error {
+	return p.updateStock(id, quantity, "decrease", token)
 }
 
 // IncreaseStock increases the stock quantity of a product by its ID.
-func (p *productClient) IncreaseStock(id uint, quantity int) error {
-	return p.updateStock(id, quantity, "increase")
+func (p *productClient) IncreaseStock(id uint, quantity int, token string) error {
+	return p.updateStock(id, quantity, "increase", token)
 }
 
 // updateStock is a helper method to update the stock quantity of a product by its ID. It sends a PATCH request to the product service with the specified action (decrease or increase).
-func (p *productClient) updateStock(id uint, quantity int, action string) error {
+func (p *productClient) updateStock(id uint, quantity int, action string, token string) error {
 	url := fmt.Sprintf(
 		"%s/api/v1/products/%d/stock/%s",
 		p.baseURL,
@@ -75,12 +76,15 @@ func (p *productClient) updateStock(id uint, quantity int, action string) error 
 	}
 
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
 
 	resp, err := p.client.Do(req)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
+
+	log.Println("Response status code:", resp.StatusCode)
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf(

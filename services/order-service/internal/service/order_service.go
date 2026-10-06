@@ -12,7 +12,7 @@ import (
 
 // OrderService defines the interface for order-related operations.
 type OrderService interface {
-	CreateOrder(userID uint, request CreateOrderRequest) (*OrderResponse, error)
+	CreateOrder(userID uint, request CreateOrderRequest, token string) (*OrderResponse, error)
 	GetOrderByID(userID uint, orderID uint) (*OrderResponse, error)
 	GetOrders(userID uint) ([]OrderResponse, error)
 }
@@ -34,7 +34,7 @@ func NewOrderService(orderRepository repository.OrderRepository, productClient c
 }
 
 // CreateOrder creates a new order for the specified user based on the provided request.
-func (s *orderService) CreateOrder(userID uint, request CreateOrderRequest) (*OrderResponse, error) {
+func (s *orderService) CreateOrder(userID uint, request CreateOrderRequest, token string) (*OrderResponse, error) {
 
 	// 1. Validate order
 	if len(request.Items) == 0 {
@@ -108,6 +108,7 @@ func (s *orderService) CreateOrder(userID uint, request CreateOrderRequest) (*Or
 		if err := s.productClient.DecreaseStock(
 			item.ProductID,
 			item.Quantity,
+			token,
 		); err != nil {
 
 			// Compensate stock that was already decreased.
@@ -115,6 +116,7 @@ func (s *orderService) CreateOrder(userID uint, request CreateOrderRequest) (*Or
 				_ = s.productClient.IncreaseStock(
 					decreased.ProductID,
 					decreased.Quantity,
+					token,
 				)
 			}
 
@@ -143,6 +145,7 @@ func (s *orderService) CreateOrder(userID uint, request CreateOrderRequest) (*Or
 			_ = s.productClient.IncreaseStock(
 				item.ProductID,
 				item.Quantity,
+				token,
 			)
 		}
 
