@@ -17,6 +17,7 @@ func (s *NotificationService) HandleOrderCreated(
 	orderEvent event.OrderCreatedEvent,
 ) error {
 
+	// TODO : Implement actual notification logic (e.g., sending email, SMS, push notification, etc.)
 	fmt.Printf(
 		"NOTIFICATION: Order #%d created successfully for User #%d. Total amount: %.2f\n",
 		orderEvent.OrderID,
