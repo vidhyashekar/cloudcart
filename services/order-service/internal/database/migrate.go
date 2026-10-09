@@ -16,5 +16,6 @@ func Migrate(db *gorm.DB) error {
 	return db.AutoMigrate(
 		&model.Order{},
 		&model.OrderItem{},
+		&model.OutboxEvent{},
 	)
 }

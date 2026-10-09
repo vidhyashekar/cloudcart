@@ -1,11 +1,7 @@
 package kafka
 
 import (
-	"encoding/json"
-	"fmt"
-
 	"github.com/IBM/sarama"
-	"github.com/vidhyashekar/cloudcart/services/order-service/internal/event"
 )
 
 // Producer is a struct that encapsulates the Kafka producer and the topic to which messages will be sent.
@@ -36,22 +32,15 @@ func NewProducer(brokers string, topic string) (*Producer, error) {
 	}, nil
 }
 
-// PublishOrderCreated publishes an OrderCreatedEvent to the Kafka topic. It serializes the event to JSON and sends it as a message to the specified topic. If any error occurs during serialization or sending, it returns the error.
-func (p *Producer) PublishOrderCreated(event event.OrderCreatedEvent) error {
-	data, err := json.Marshal(event)
-	if err != nil {
-		return err
-	}
-
+// Publish sends a message with the specified event type and payload to the Kafka topic. It constructs a ProducerMessage and sends it using the underlying Kafka producer. If any error occurs during sending, it returns the error.
+func (p *Producer) Publish(eventType string, payload []byte) error {
 	message := &sarama.ProducerMessage{
 		Topic: p.topic,
-		Value: sarama.StringEncoder(data),
-		Key: sarama.StringEncoder(
-			fmt.Sprintf("%d", event.OrderID),
-		),
+		Key:   sarama.StringEncoder(eventType),
+		Value: sarama.ByteEncoder(payload),
 	}
 
-	_, _, err = p.producer.SendMessage(message)
+	_, _, err := p.producer.SendMessage(message)
 
 	return err
 }

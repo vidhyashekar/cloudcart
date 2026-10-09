@@ -1,19 +1,24 @@
 package repository
 
 import (
+	"encoding/json"
+
+	"github.com/vidhyashekar/cloudcart/services/order-service/internal/event"
 	"github.com/vidhyashekar/cloudcart/services/order-service/internal/model"
 	"gorm.io/gorm"
 )
 
 // orderRepository is the concrete implementation of the OrderRepository interface.
 type orderRepository struct {
-	db *gorm.DB
+	db               *gorm.DB
+	outboxRepository OutboxRepository
 }
 
 // NewOrderRepository creates a new instance of orderRepository with the provided database connection.
-func NewOrderRepository(db *gorm.DB) OrderRepository {
+func NewOrderRepository(db *gorm.DB, outboxRepository OutboxRepository) OrderRepository {
 	return &orderRepository{
-		db: db,
+		db:               db,
+		outboxRepository: outboxRepository,
 	}
 }
 
@@ -55,18 +60,50 @@ func (r *orderRepository) Update(order *model.Order) error {
 	return r.db.Save(order).Error
 }
 
-// CreateWithTransaction creates an order along with its associated items in a single transaction.
-func (r *orderRepository) CreateWithTransaction(order *model.Order, items []model.OrderItem) error {
+// CreateOrderWithOutbox creates an order, its associated items, and an outbox event within a single database transaction. If any operation fails, the entire transaction is rolled back.
+func (r *orderRepository) CreateOrderWithOutbox(order *model.Order, items []model.OrderItem) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
+
+		// 1. Create order
 		if err := tx.Create(order).Error; err != nil {
 			return err
 		}
 
+		// 2. Set generated Order ID on every item
 		for i := range items {
 			items[i].OrderID = order.ID
 		}
 
+		// 3. Create order items
 		if err := tx.Create(&items).Error; err != nil {
+			return err
+		}
+
+		// 4. Create event payload AFTER order ID exists
+		eventPayload := event.OrderCreatedEvent{
+			EventType:   "order.created",
+			OrderID:     order.ID,
+			UserID:      order.UserID,
+			TotalAmount: order.TotalAmount,
+		}
+
+		payload, err := json.Marshal(eventPayload)
+		if err != nil {
+			return err
+		}
+
+		// 5. Create outbox event
+		outboxEvent := &model.OutboxEvent{
+			EventType:   "order.created",
+			AggregateID: order.ID,
+			Payload:     string(payload),
+			Status:      "PENDING",
+		}
+
+		if err := r.outboxRepository.Create(
+			tx,
+			outboxEvent,
+		); err != nil {
 			return err
 		}
 
