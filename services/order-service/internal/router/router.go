@@ -14,7 +14,7 @@ func RegisterRoutes(orderHandler *handler.OrderHandler, jwtSecret string) *gin.E
 
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
-			"status": "UP",
+			"status": "Order Service up and running",
 		})
 	})
 
