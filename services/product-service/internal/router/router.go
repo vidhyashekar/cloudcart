@@ -13,7 +13,7 @@ func RegisterRoutes(productHandler *handler.ProductHandler, jwtSecret string) *g
 
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
-			"status": "UP",
+			"status": "Product Service up and running",
 		})
 	})
 
