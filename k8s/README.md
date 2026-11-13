@@ -53,3 +53,10 @@ Exit:
 ```
 \q
 ```
+
+## ConfigMaps & Secrets
+We'll keep environment-specific values separate from application deployment manifests.
+
+Two files created:
+1. configmap.yaml – non-sensitive configuration.
+2. secrets.yaml – passwords and JWT secret.
