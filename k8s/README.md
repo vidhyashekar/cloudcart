@@ -81,3 +81,28 @@ Notice:
 - No JWT Secret is needed because this service currently only consumes Kafka events.
 - No HTTP Service is required.
 
+
+### Basic Commands
+
+```kubectl get nodes```
+
+```kubectl get namespaces```
+
+```kubectl get pods -n <namespace>```
+
+```kubectl get deployments -n <namespace>```
+
+```kubectl get svc -n <namespace>```
+
+```kubectl get pvc -n <namespace>```
+
+```kubectl get configmaps -n <namespace>```
+
+```kubecl logs deployment/<name> -n <namespace>```
+
+```kubectl describe deployment/<name> -n <namespace>```
+
+```kubectl exec -it deployment/<name -n namespace -- wget -qO- <url/endpoint>```
+
+```kubectl apply -f <filename>```
+

@@ -7,27 +7,25 @@ import (
 	"github.com/vidhyashekar/cloudcart/services/auth-service/internal/middleware"
 )
 
-func RegisterRoutes(authHandler *handler.AuthHandler, jwtManager *auth.JWTManager) *gin.Engine {
+// RegisterRoutes sets up the routes for the authentication service, including health checks and authentication-related endpoints. It also applies authentication middleware to protected routes.
+func RegisterRoutes(
+	authHandler *handler.AuthHandler,
+	healthHandler *handler.HealthHandler,
+	jwtManager *auth.JWTManager,
+) *gin.Engine {
 
 	router := gin.Default()
 
-	router.GET("/health", handler.HealthHandler)
+	// Health check endpoints
+	router.GET("/health/live", healthHandler.Live)
+	router.GET("/health/ready", healthHandler.Ready)
 
-	router.POST(
-		"/api/v1/auth/register",
-		authHandler.Register,
-	)
+	// Public authentication endpoints
+	router.POST("/api/v1/auth/register", authHandler.Register)
+	router.POST("/api/v1/auth/login", authHandler.Login)
+	router.POST("/api/v1/auth/refresh", authHandler.Refresh)
 
-	router.POST(
-		"/api/v1/auth/login",
-		authHandler.Login,
-	)
-
-	router.POST(
-		"/api/v1/auth/refresh",
-		authHandler.Refresh,
-	)
-
+	// Protected authentication endpoints
 	authRoutes := router.Group("/api/v1/auth")
 	authRoutes.Use(middleware.AuthMiddleware(jwtManager))
 	{
