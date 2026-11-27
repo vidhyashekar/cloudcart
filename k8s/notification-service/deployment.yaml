@@ -1,3 +1,4 @@
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -13,16 +14,25 @@ spec:
       labels:
         app: notification-service
     spec:
+      terminationGracePeriodSeconds: 30
       containers:
         - name: notification-service
-          image: cloudcart-notification-service:latest
+          image: cloudcart-notification-service:v2
           imagePullPolicy: IfNotPresent
+
           envFrom:
             - configMapRef:
                 name: cloudcart-config
+
           env:
             - name: KAFKA_GROUP_ID
               value: "notification-service"
+
+          ports:
+            - containerPort: 8083
+              name: http
+              protocol: TCP
+
           resources:
             requests:
               cpu: "100m"
@@ -30,3 +40,21 @@ spec:
             limits:
               cpu: "500m"
               memory: "512Mi"
+
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 8083
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 8083
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3

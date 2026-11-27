@@ -73,7 +73,8 @@ func New() (*App, error) {
 }
 
 func (a *App) Run() error {
-	router := router.RegisterRoutes(a.AuthHandler, a.JWTManager)
+	healthHandler := handler.NewHealthHandler(a.DB)
+	router := router.RegisterRoutes(a.AuthHandler, healthHandler, a.JWTManager)
 
 	a.Logger.Infof("Auth Service started on port %s", a.Config.Port)
 	return router.Run(":" + a.Config.Port)

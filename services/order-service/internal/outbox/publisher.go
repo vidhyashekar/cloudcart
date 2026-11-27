@@ -1,6 +1,7 @@
 package outbox
 
 import (
+	"context"
 	"log"
 	"time"
 
@@ -22,16 +23,21 @@ func NewPublisher(repository repository.OutboxRepository, producer *kafka.Produc
 	}
 }
 
-// Start begins the process of publishing outbox events to Kafka at regular intervals.
-func (p *Publisher) Start() {
+func (p *Publisher) Start(ctx context.Context) {
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 
 	log.Println("Outbox publisher started")
 
-	// Continuously listen for ticker events and publish pending outbox events.
-	for range ticker.C {
-		p.publishPendingEvents()
+	for {
+		select {
+		case <-ctx.Done():
+			log.Println("Outbox publisher shutting down")
+			return
+
+		case <-ticker.C:
+			p.publishPendingEvents()
+		}
 	}
 }
 

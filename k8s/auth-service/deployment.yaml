@@ -1,28 +1,29 @@
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: product-service
+  name: auth-service
   namespace: cloudcart
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: product-service
+      app: auth-service
   template:
     metadata:
       labels:
-        app: product-service
+        app: auth-service
     spec:
       containers:
-        - name: product-service
-          image: cloudcart-product-service:latest
+        - name: auth-service
+          image: cloudcart-auth-service:health-check-v1
           imagePullPolicy: IfNotPresent
           ports:
-            - containerPort: 8081
+            - containerPort: 8080
               name: http
           env:
             - name: PORT
-              value: "8081"
+              value: "8080"
           envFrom:
             - configMapRef:
                 name: cloudcart-config
@@ -30,16 +31,20 @@ spec:
                 name: cloudcart-secrets
           readinessProbe:
             httpGet:
-              path: /health
-              port: 8081
+              path: /health/ready
+              port: 8080
             initialDelaySeconds: 10
             periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 3
           livenessProbe:
             httpGet:
-              path: /health
-              port: 8081
+              path: /health/live
+              port: 8080
             initialDelaySeconds: 20
             periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
           resources:
             requests:
               cpu: "100m"
@@ -52,14 +57,14 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: product-service
+  name: auth-service
   namespace: cloudcart
 spec:
   type: ClusterIP
   selector:
-    app: product-service
+    app: auth-service
   ports:
     - name: http
-      port: 8081
-      targetPort: 8081
+      port: 8080
+      targetPort: 8080
       protocol: TCP

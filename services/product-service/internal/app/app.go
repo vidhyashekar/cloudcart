@@ -53,7 +53,9 @@ func New() (*App, error) {
 
 // Run starts the HTTP server and registers the routes for the application.
 func (a *App) Run() error {
-	r := router.RegisterRoutes(a.ProductHandler, a.Config.JWTSecret)
+	healthHandler := handler.NewHealthHandler(a.DB)
+
+	r := router.RegisterRoutes(a.ProductHandler, healthHandler, a.Config.JWTSecret)
 
 	return r.Run(":" + a.Config.Port)
 }

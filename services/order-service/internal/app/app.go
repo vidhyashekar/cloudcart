@@ -1,6 +1,13 @@
 package app
 
 import (
+	"context"
+	"errors"
+	"fmt"
+	"log"
+	"net/http"
+	"time"
+
 	"github.com/sirupsen/logrus"
 	"github.com/vidhyashekar/cloudcart/services/order-service/internal/client"
 	"github.com/vidhyashekar/cloudcart/services/order-service/internal/config"
@@ -21,6 +28,7 @@ type App struct {
 	OrderService    service.OrderService
 	OrderHandler    *handler.OrderHandler
 	OutboxPublisher *outbox.Publisher
+	KafkaProducer   *kafka.Producer
 }
 
 // New initializes the application and wires all dependencies.
@@ -100,17 +108,111 @@ func New() (*App, error) {
 		OrderService:    orderService,
 		OrderHandler:    orderHandler,
 		OutboxPublisher: outboxPublisher,
+		KafkaProducer:   kafkaProducer,
 	}, nil
 }
 
-// Run starts the Gin router and listens for incoming HTTP requests on the specified port.
-func (a *App) Run() error {
-	// Start the outbox publisher in a separate goroutine to continuously process and publish events in the background.
-	go a.OutboxPublisher.Start()
+// Run starts the HTTP server and background Outbox publisher.
+func (a *App) Run(ctx context.Context) error {
 
-	// register routes
-	r := router.RegisterRoutes(a.OrderHandler, a.Config.JWTSecret)
+	healthHandler := handler.NewHealthHandler(a.DB)
 
-	// Start the HTTP server and listen on the configured port.
-	return r.Run(":" + a.Config.Port)
+	// Register routes.
+	r := router.RegisterRoutes(
+		a.OrderHandler,
+		healthHandler,
+		a.Config.JWTSecret,
+	)
+
+	// Create HTTP server.
+	server := &http.Server{
+		Addr:              ":" + a.Config.Port,
+		Handler:           r,
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+
+	// Create context for Outbox publisher.
+	publisherCtx, cancelPublisher := context.WithCancel(context.Background())
+	publisherDone := make(chan struct{})
+
+	// Start Outbox publisher in a separate goroutine.
+	go func() {
+		defer close(publisherDone)
+		a.OutboxPublisher.Start(publisherCtx)
+	}()
+
+	// Start HTTP server in a separate goroutine.
+	serverErr := make(chan error, 1)
+
+	go func() {
+		log.Printf("Order Service starting on port %s", a.Config.Port)
+
+		err := server.ListenAndServe()
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			serverErr <- err
+		}
+	}()
+
+	var runErr error
+
+	// Wait for shutdown signal or HTTP server failure.
+	select {
+	case <-ctx.Done():
+		log.Println("Shutdown signal received")
+
+	case err := <-serverErr:
+		runErr = fmt.Errorf("HTTP server failed: %w", err)
+	}
+
+	// 1. Gracefully shut down HTTP server.
+	log.Println("Shutting down HTTP server...")
+
+	shutdownCtx, cancelShutdown := context.WithTimeout(
+		context.Background(),
+		10*time.Second,
+	)
+
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		log.Printf("HTTP server shutdown failed: %v", err)
+		_ = server.Close()
+
+		if runErr == nil {
+			runErr = fmt.Errorf("HTTP server shutdown: %w", err)
+		}
+	}
+
+	cancelShutdown()
+
+	// 2. Stop Outbox publisher and wait for it to finish.
+	log.Println("Stopping Outbox publisher...")
+	cancelPublisher()
+	<-publisherDone
+
+	// 3. Close Kafka producer.
+	log.Println("Closing Kafka producer...")
+	if err := a.KafkaProducer.Close(); err != nil {
+		log.Printf("Failed to close Kafka producer: %v", err)
+
+		if runErr == nil {
+			runErr = fmt.Errorf("close Kafka producer: %w", err)
+		}
+	}
+
+	// 4. Close PostgreSQL connection.
+	log.Println("Closing PostgreSQL connection...")
+
+	sqlDB, err := a.DB.DB()
+	if err != nil {
+		if runErr == nil {
+			runErr = fmt.Errorf("get SQL database connection: %w", err)
+		}
+	} else if err := sqlDB.Close(); err != nil {
+		if runErr == nil {
+			runErr = fmt.Errorf("close PostgreSQL connection: %w", err)
+		}
+	}
+
+	log.Println("Order Service shutdown completed")
+
+	return runErr
 }

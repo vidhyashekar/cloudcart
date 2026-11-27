@@ -4,21 +4,28 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"sync/atomic"
 
 	"github.com/IBM/sarama"
 	"github.com/vidhyashekar/cloudcart/services/notification-service/internal/event"
 	"github.com/vidhyashekar/cloudcart/services/notification-service/internal/service"
 )
 
-// Consumer represents a Kafka consumer that listens for order events and processes them.
 type Consumer struct {
 	consumer sarama.ConsumerGroup
 	topic    string
 	service  *service.NotificationService
+
+	ready   atomic.Bool
+	running atomic.Bool
 }
 
-// NewConsumer creates a new Kafka consumer for the specified topic and group ID.
-func NewConsumer(brokers string, topic string, groupID string, notificationService *service.NotificationService) (*Consumer, error) {
+func NewConsumer(
+	brokers string,
+	topic string,
+	groupID string,
+	notificationService *service.NotificationService,
+) (*Consumer, error) {
 
 	config := sarama.NewConfig()
 
@@ -45,23 +52,40 @@ func NewConsumer(brokers string, topic string, groupID string, notificationServi
 	}, nil
 }
 
-// consumerHandler is a custom implementation of sarama.ConsumerGroupHandler
+func (c *Consumer) IsReady() bool {
+	return c.ready.Load()
+}
+
+func (c *Consumer) IsRunning() bool {
+	return c.running.Load()
+}
+
 type consumerHandler struct {
 	service *service.NotificationService
+	ready   *atomic.Bool
 }
 
-// Setup is run at the beginning of a new session, before ConsumeClaim.
-func (h *consumerHandler) Setup(sarama.ConsumerGroupSession) error {
+func (h *consumerHandler) Setup(
+	sarama.ConsumerGroupSession,
+) error {
+	h.ready.Store(true)
+	log.Println("Kafka consumer session established")
 	return nil
 }
 
-// Cleanup is run at the end of a session, once all ConsumeClaim goroutines have exited.
-func (h *consumerHandler) Cleanup(sarama.ConsumerGroupSession) error {
+func (h *consumerHandler) Cleanup(
+	sarama.ConsumerGroupSession,
+) error {
+	h.ready.Store(false)
+	log.Println("Kafka consumer session ended")
 	return nil
 }
 
-// ConsumeClaim must start a consumer loop of ConsumerGroupClaim's Messages().
-func (h *consumerHandler) ConsumeClaim(session sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim) error {
+func (h *consumerHandler) ConsumeClaim(
+	session sarama.ConsumerGroupSession,
+	claim sarama.ConsumerGroupClaim,
+) error {
+
 	for message := range claim.Messages() {
 
 		log.Printf(
@@ -77,24 +101,20 @@ func (h *consumerHandler) ConsumeClaim(session sarama.ConsumerGroupSession, clai
 			message.Value,
 			&orderEvent,
 		); err != nil {
-
 			log.Printf(
 				"Failed to deserialize Kafka message: %v",
 				err,
 			)
-
 			continue
 		}
 
 		if err := h.service.HandleOrderCreated(
 			orderEvent,
 		); err != nil {
-
 			log.Printf(
 				"Failed to process order event: %v",
 				err,
 			)
-
 			continue
 		}
 
@@ -109,26 +129,37 @@ func (h *consumerHandler) ConsumeClaim(session sarama.ConsumerGroupSession, clai
 	return nil
 }
 
-// Start begins consuming messages from the Kafka topic and processes them using the consumerHandler.
-func (c *Consumer) Start() {
+func (c *Consumer) Start(ctx context.Context) {
+	c.running.Store(true)
+	defer c.running.Store(false)
+	defer c.ready.Store(false)
 
 	handler := &consumerHandler{
 		service: c.service,
+		ready:   &c.ready,
 	}
 
 	for {
+		if ctx.Err() != nil {
+			return
+		}
 
 		err := c.consumer.Consume(
-			context.Background(),
+			ctx,
 			[]string{c.topic},
 			handler,
 		)
 
+		if ctx.Err() != nil {
+			return
+		}
+
 		if err != nil {
-			log.Printf(
-				"Kafka consumer error: %v",
-				err,
-			)
+			log.Printf("Kafka consumer error: %v", err)
 		}
 	}
+}
+
+func (c *Consumer) Close() error {
+	return c.consumer.Close()
 }
